@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gemini Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: 60vh;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+        }
+
+        .message {
+            margin: 1rem;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            margin-left: auto;
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 1rem 1rem 0 1rem;
+            padding: 0.75rem;
+        }
+
+        .bot-message {
+            margin-right: auto;
+            background-color: #e9ecef;
+            border-radius: 1rem 1rem 1rem 0;
+            padding: 0.75rem;
+        }
+
+        .error-message {
+            margin: 1rem auto;
+            background-color: #dc3545;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #e9ecef;
+            border-radius: 1rem;
+            margin: 1rem;
+            width: fit-content;
+        }
+
+        .typing-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #6c757d;
+            border-radius: 50%;
+            animation: typing 1s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-0.25rem); }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="display-4">Gemini Chat</h1>
+            <p class="lead text-muted">AI 聊天助手</p>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="chat-container p-3 mb-4" id="chat-container">
+                    <!-- Messages will be added here -->
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-group">
+                    <input type="text" id="message-input" class="form-control" 
+                           placeholder="輸入訊息..." aria-label="Message">
+                    <button class="btn btn-primary" type="button" id="send-button" 
+                            onclick="sendMessage()">
+                        發送
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function addMessage(message, type = 'bot') {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${
+                type === 'user' ? 'user-message' : 
+                type === 'error' ? 'error-message' : 'bot-message'
+            }`;
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const chatContainer = document.getElementById('chat-container');
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            chatContainer.appendChild(indicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return indicator;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const message = input.value.trim();
+            if (!message) return;
+
+            try {
+                // 禁用輸入
+                input.disabled = true;
+                sendButton.disabled = true;
+                sendButton.innerHTML = `
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    發送中...
+                `;
+
+                addMessage(message, 'user');
+                input.value = '';
+
+                const typingIndicator = addTypingIndicator();
+
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                typingIndicator.remove();
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '發生未知錯誤');
+                }
+
+                if (data.response) {
+                    addMessage(data.response, 'bot');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage(`錯誤: ${error.message}`, 'error');
+            } finally {
+                // 重新啟用輸入
+                input.disabled = false;
+                sendButton.disabled = false;
+                sendButton.innerHTML = '發送';
+                input.focus();
+            }
+        }
+
+        // 按 Enter 發送訊息
+        document.getElementById('message-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
